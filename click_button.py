@@ -1,8 +1,10 @@
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 
 # Replace 'YOUR_WEBSITE_URL' with the URL of the website you want to open
@@ -10,43 +12,51 @@ website_url = 'YOUR_WEBSITE_URL'
 # Replace 'YOUR_BUTTON_CLASS' with the class name of the button you want to click
 button_class = 'YOUR_BUTTON_CLASS'
 
-# Function to perform the desired actions
-def automate():
-    # Open the website
+# Function to initialize the WebDriver
+def initialize_driver():
+    options = Options()
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=775,563")
+    return webdriver.Chrome(options=options)
+
+# Function to perform the initial interactions and return the driver instance and button element
+def initial_interactions(driver):
     driver.get(website_url)
-    while True:
-        try:
-            # Wait for the button to be clickable
-            WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, button_class)))
-            # Find the parent element (in this case, the body)
-            parent_element = driver.find_element(By.TAG_NAME, 'body')
-            # Find the button element within the parent element
-            button = parent_element.find_element(By.CLASS_NAME, button_class)
-            # Scroll the button into view
-            driver.execute_script("arguments[0].scrollIntoView(true);", button)
-            # Click the button
-            button.click()
-            time.sleep(5)  # Wait for 5 seconds before retrying
-            # refresh the page
-            driver.refresh()
-            break
-        except (TimeoutException, ElementClickInterceptedException):
-            print("Button not clickable. Retrying...")
-            # If button not clickable, refresh the page and try again
-            driver.refresh()
-            time.sleep(5)  # Wait for 5 seconds before retrying
+    try:
+        button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, button_class)))
+        return button
+    except TimeoutException:
+        print("Button not found.")
+        return None
 
-# Setting up the Chrome driver
-driver = webdriver.Chrome()
+# Function to perform the desired actions
+def automate(driver, button):
+    try:
+        driver.execute_script("arguments[0].scrollIntoView(true);", button)
+        time.sleep(2)
+        button.click()
+        time.sleep(5)
+        driver.refresh()
+    except Exception as e:
+        print("Error:", e)
 
-# Infinite loop to run the automation until stopped manually
-try:
-    while True:
-        automate()
-        # Sleep for 35 minutes
-        time.sleep(2100)  # 35 minutes = 35 * 60 seconds
-except KeyboardInterrupt:
-    print("Program stopped manually.")
-finally:
-    # Close the browser window
-    driver.quit()
+# Main function
+def main():
+    driver = initialize_driver()
+    try:
+        button = initial_interactions(driver)
+        if button:
+            while True:
+                automate(driver, button)
+                time.sleep(2100)  # 35 minutes = 35 * 60 seconds
+                driver.refresh()
+                button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, button_class)))
+                time.sleep(2)  # Wait for the page to load completely
+                driver.execute_script("window.focus();")
+    except KeyboardInterrupt:
+        print("Program stopped manually.")
+    finally:
+        driver.quit()
+
+if __name__ == "__main__":
+    main()
